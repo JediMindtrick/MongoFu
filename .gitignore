@@ -12,3 +12,8 @@ logs
 results
 
 npm-debug.log
+mongodb/data/db
+mongodb/data/db/*
+mongodb/data/mongodb.log
+mongodb/*
+mongodb/bin/*

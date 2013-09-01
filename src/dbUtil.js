@@ -4,13 +4,27 @@ require('./_extensions');
 
 exports.noOp = _.noOp;
 
+var markCommittedLocal = function(doc){
+  doc._meta.dbStatus = 'committedLocal';
+  return doc;
+};
+exports.markCommittedLocal = markCommittedLocal;
+
+var isCommittedLocal = function(doc){
+  return doc._meta.dbStatus === 'committedLocal';
+};
+exports.isCommittedLocal = isCommittedLocal;
+
 var markCommitted = function(doc){
-  console.log('(transactor) committing doc in local:');
-  console.log(JSON.stringify(doc));
-  doc._meta.dbStatus = 'committed';
+  doc._meta.dbStatus = 'committedBoth';
   return doc;
 };
 exports.markCommitted = markCommitted;
+
+var isCommittedBoth = function(doc){
+  return doc._meta.dbStatus === 'committedBoth';
+};
+exports.isCommittedBoth = isCommittedBoth;
 
 var copyDoc = function(toCopy){
   return JSON.parse(JSON.stringify(toCopy));
@@ -25,7 +39,7 @@ exports.getUniqueId = getUniqueId;
 var getNewDbDoc = function(toInsert){
   toInsert._meta = {
     type: 'Document',
-    dbStatus: 'localOnly' 
+    dbStatus: 'uncommitted' 
   };
 
   toInsert._id = getUniqueId();

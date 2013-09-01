@@ -78,7 +78,8 @@ var runTransaction = function(db,txDb,tx,onError,onSuccess){
 };
 exports.runTransaction = runTransaction;
 
-var runTransactionAgainstLocal = function(db,tx){	
+var runTransactionAgainstLocal = function(db,tx){
+
 	//find every item, and mark it as committed
 	_.each(
 		tx.actions,
@@ -89,15 +90,13 @@ var runTransactionAgainstLocal = function(db,tx){
 				return item._id === _doc._id;
 			});
 
-			if(_found){
-				dbUtil.markCommitted(_found);
-			}else{
-				dbUtil.markCommitted(_doc);
-				db.Data.push(_doc);
-			}
-	});
+			_doc = _found ? _found : _doc;
+
+			dbUtil.markCommittedLocal(_doc);
+			db.Data.push(_doc);
+		});
 
 	//insert the tx itself
-	db.EventTransactions.push(dbUtil.markCommitted(tx));
+	db.EventTransactions.push(dbUtil.markCommittedLocal(tx));
 };
 exports.runTransactionAgainstLocal = runTransactionAgainstLocal;

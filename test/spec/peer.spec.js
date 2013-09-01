@@ -35,9 +35,8 @@ describe('peer operations',function(){
           expect(schema._meta.type).toEqual('Schema');
           expect(schema._meta.isCommitted).toBe(true);
           expect(schema.DbName).toEqual('AutoTest:Peer:InMemoryTest');
-        });
+        });       
         */
-
 
         cleanup();
     });

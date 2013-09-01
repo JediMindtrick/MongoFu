@@ -275,10 +275,12 @@ var destroySnapshot = function(snapshot,onSuccess){
 };
 
 //no need to update to head, but need to write a routine that will do so
-var loadHead = function(onSuccess,_conn){
+var loadHead = function(_conn,_dbName,callback){
+//var loadHead = function(onSuccess,_conn){
 
   var allSnaps = [];
-  listAllSnapshots(dbName,function(snaps){
+//  listAllSnapshots(dbName,function(snaps){
+  listAllSnapshots(_conn,_dbName,function(snaps){
     allSnaps = snaps;
 
     //load default
@@ -354,26 +356,25 @@ var copyDoc = function(toCopy){
   return dbUtil.copyDoc(toCopy);
 };
 
-var listAllSnapshots = function(name,onSuccess,_conn){
+//var listAllSnapshots = function(name,onSuccess,_conn){
+  var listAllSnapshots = function(_conn,_dbName,callback){
 
-  var _toRunDb = _conn || db;
-
-  _toRunDb.collectionNames(
+  _conn.collectionNames(
     function(err, collections){
       if(err) throw err;
 
       var snapshots = _.filter(
         collections,
         function(item){
-          return item.name.indexOf(name + '-') >= 0 &&
-            item.name.indexOf(name + '-Base') === -1;
+          return item.name.indexOf(_dbName + '-') >= 0 && //part of the db
+            item.name.indexOf(_dbName + '-Base') === -1; //but not the base
         });
 
       _.each(snapshots,function(snap){
         _.print('Snapshot "' + snap.options.create + '"');
       });
 
-      onSuccess(snapshots);
+      callback(snapshots);
     });
 };
 exports.listAllSnapshots = listAllSnapshots;
@@ -460,15 +461,14 @@ var deleteBase = function(name,onSuccess,_conn){
 exports.deleteBase = deleteBase;
 
 var deleteAllSnapshots = function(name,onSuccess,_conn){
-  var _toRunDb = _conn || db;
 
   listAllSnapshots(
+    _conn,
     name,
     function(snapshots){
       _.print('deleting snapshots ' + JSON.stringify(snapshots));
       deleteCollectionList(snapshots,onSuccess,_conn);
-    },
-    _toRunDb);
+    });
 
 };
 exports.deleteAllSnapshots = deleteAllSnapshots;

@@ -70,21 +70,6 @@ var runCommand = function(){
 };
 
 var tests = {
-  '-testTransact':function(onSuccess){
-
-    var tx = transact.createTransaction({});
-
-    console.log(JSON.stringify(tx));
-
-    var _db = peer.getRemote();
-    var _txDb = _db;
-
-    transact.runTransaction(_db,_txDb,tx,
-      onSuccess,
-      function(){
-        tests['-listAllRemote'](onSuccess);
-      });
-  },
   '-loadSnapshot': function(onSuccess){
       peer.connect(
         url,

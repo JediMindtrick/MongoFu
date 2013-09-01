@@ -46,7 +46,6 @@ var getNewDbDoc = function(toInsert){
 
   return toInsert;
 };
-
 exports.getNewDbDoc = getNewDbDoc;
 
 var upsertToRemote = function(coll,toInsert,onError,onSuccess){

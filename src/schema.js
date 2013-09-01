@@ -17,6 +17,10 @@ var getDataDocs = function(coll){
 };
 exports.getDataDocs = getDataDocs;
 
+var _schemaContainsType = function(_db,tx,doc){
+	return _.contains(_db.Schema.Types,doc._meta.type);
+};
+
 var getNewSchemaDoc = function(dbName){
 
  	var toReturn = dbUtil.getNewDbDoc({});
@@ -29,27 +33,37 @@ var getNewSchemaDoc = function(dbName){
  	toReturn.Types = ['Document','Transaction','Schema'];
  	toReturn.Constraints = {
  		Document: {
- 			atAllTimes: (_.always).toString(), //invariant
- 			onUpsert: (function(coll,tx,doc){
- 				return _.contains(getSchemaDoc(coll).Types,doc._meta.type) ||
- 					_.contains(getSchemaDoc(tx).Types,doc._meta.type);
- 			}).toString(),
- 			onDelete: (_.always).toString()
+ 			atAllTimes: _schemaContainsType.toString(), //invariant
+ 			onUpsert: _schemaContainsType.toString(),
+ 			onDelete: _.always.toString()
  		},
  		Transaction:{
- 			atAllTimes: (_.always).toString(), //invariant
- 			onUpsert: (_.always).toString(),
- 			onDelete: (_.always).toString()
+ 			atAllTimes: _.always.toString(), //invariant
+ 			onUpsert: _.always.toString(),
+ 			onDelete: _.always.toString()
  		},
  		Schema:{
- 			atAllTimes: (_.always).toString(), //invariant
- 			onUpsert: (function(coll,tx,doc){
- 				return _.contains(getSchemaDoc(coll).Types,doc._meta.type);
- 			}).toString(),
- 			onDelete: (_.always).toString()
+ 			atAllTimes: _.always.toString(), //invariant
+ 			onUpsert: _.always.toString(),
+ 			onDelete: _.always.toString()
  		}
  	};
 
  	return toReturn;
  };
  exports.getNewSchemaDoc = getNewSchemaDoc;
+
+ var getConstraintChecker = function(schemaDoc){
+ 	var toReturn = {};
+
+ 	_.each(schemaDoc.Constraints,function(_checks,_type){
+ 		var typeChecks = {};
+ 		_.each(_checks,function(_check,_dbEvent){
+ 			typeChecks[_dbEvent] = eval('(' + _check + ')');
+ 		});
+ 		toReturn[_type] = typeChecks;
+ 	});
+
+ 	return toReturn;
+ };
+ exports.getConstraintChecker = getConstraintChecker;

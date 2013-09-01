@@ -43,11 +43,6 @@ var connect = function(_url,onSuccess){
 };
 exports.connect = connect;
 
-var getRemote = function(){
-  return RemoteDb;
-};
-exports.getRemote = getRemote;
-
 var initializeBase = function(baseName,onSuccess,_db){
     var _baseName = baseName + '-Base-' + getUniqueId();
     _.print('Initializing base for ' + _baseName);
@@ -148,7 +143,6 @@ exports.listAllCollections = listAllCollections;
 exports.pushTxToRemote = require('./snapshot.js').pushTxToRemote;
 
 var _getLocalDbFromRemote = function(_db,callback){
-
       
   _db.find({}).toArray(
     function(err,docs){
@@ -216,17 +210,6 @@ exports.loadHead = loadHead;
 
 var noOp = dbUtil.noOp;
 exports.noOp = noOp;
-
-var insertLocal = function(/*toInsert*/){
-  var args = _.toArray(arguments);
-  var tx = transaction.createTransaction.apply(this,args);
-
-  LocalDb.Transactions.push(tx);
-
-  return tx;
-};
-
-exports.insert = insertLocal;
 
 var getUniqueId = function(){
   return dbUtil.getUniqueId();

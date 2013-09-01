@@ -1,0 +1,1 @@
+exports.testUrl = 'mongodb://localhost:27017/mongtomic';

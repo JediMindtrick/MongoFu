@@ -41,7 +41,7 @@ var start = function(){
       function(_local){
         LocalDb = _local;
         runCommand();
-    });    
+    });
   }
 };
 
@@ -56,7 +56,7 @@ var runCommand = function(){
 
   if(operations[arg1]){
     peer.connect(url,function(){
-      operations[arg1](function(){        
+      operations[arg1](function(){
         peer.close();
         console.log('done');
       });
@@ -95,7 +95,7 @@ var tests = {
               LocalDb = snap;
               console.log('Snapshot data loaded.');
               tests['-listAllLocal'](onSuccess);
-          });          
+          });
         });
   },
   '-commitMany': function(onSuccess){
@@ -118,8 +118,8 @@ var tests = {
             LocalDb = newLocal;
 
             console.log('(test) Listing all local:');
-            tests['-listAllLocal'](onSuccess);    
-          });      
+            tests['-listAllLocal'](onSuccess);
+          });
     });
 
   },
@@ -136,7 +136,7 @@ var tests = {
         console.log(JSON.stringify(err));
         onSuccess();
       },
-      function(){        
+      function(){
         console.log('Listing all remote:');
         tests['-listAllRemote'](onSuccess);
       });
@@ -165,7 +165,7 @@ var tests = {
       _.each(docs,function(doc){
         console.log(JSON.stringify(doc));
       });
-      onSuccess();      
+      onSuccess();
     });
   }
 };
@@ -177,19 +177,22 @@ var operations = {
       operations['-init'](onSuccess);
     });
   },
-  '-init':function(onSuccess){
-      var _baseName = arg2 + '-Base-' + peer.getUniqueId();
-
-      peer.initializeCollection(
-        _baseName,
-        function(_schemaDoc){
-          console.log(JSON.stringify(_schemaDoc));
-          onSuccess();
-        });
+  '-initBase':function(onSuccess){
+      peer.initializeBase(
+          arg2,
+          function(_schemaDoc){
+              console.log(JSON.stringify(_schemaDoc));
+              onSuccess();
+          });
   },
-  '-delete': function(onSuccess){
-      var _baseName = arg2;
-      peer.deleteCollection(_baseName,onSuccess);
+  '-deleteBase': function(onSuccess){
+      console.log('attempting to delete base for ' + arg2);
+      peer.getBaseName(arg2,function(name){
+          peer.deleteCollection(name,onSuccess);
+      });
+  },
+  '-deleteBeginningWith': function(onSuccess){
+    peer.deleteBeginningWith(arg2,onSuccess);
   },
   '-la': function(onSuccess){
     peer.listAllCollections(function(collections){
@@ -201,21 +204,20 @@ var operations = {
   },
   '-d': function(onSuccess){
     console.log('preparing to delete snapshots...');
-    peer.deleteAllSnapshots(dbName,function(coll){  
+    peer.deleteAllSnapshots(dbName,function(coll){
       console.log('snapshots deleted');
       peer.listAllSnapshots(dbName,function(snapshots){
         console.log(snapshots);
         onSuccess();
       });
-    });        
+    });
   },
   '-l': function(onSuccess){
     peer.listAllSnapshots(dbName,function(snapshots){
-
       peer.getBaseName(dbName,function(name){
         onSuccess();
       });
-    });        
+    });
   }
 };
 

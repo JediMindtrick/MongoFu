@@ -1,10 +1,8 @@
-var MongoClient = _ = require('underscore')
+var _ = require('underscore')
  , ObjectID = require('mongodb').ObjectID;
+require('./_extensions');
 
-
-var noOp = function(){
-};
-exports.noOp = noOp;
+exports.noOp = _.noOp;
 
 var markCommitted = function(doc){
   console.log('(transactor) committing doc in local:');

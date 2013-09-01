@@ -1,5 +1,4 @@
-var MongoClient = _ = require('underscore')
- , ObjectID = require('mongodb').ObjectID
+var _ = require('underscore')
  , dbUtil = require('./dbUtil');
 
 var noOp = dbUtil.noOp;

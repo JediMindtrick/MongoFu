@@ -1,1 +1,1 @@
-../mongodb/bin/mongod --config ../mongodb/data/mongodb.conf
+../mongodb/bin/mongod --config ../mongodb/data/mongodb.conf --smallfiles

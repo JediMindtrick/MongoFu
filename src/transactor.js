@@ -2,7 +2,10 @@ var MongoClient = require('mongodb').MongoClient
  , _ = require('underscore')
  , ObjectID = require('mongodb').ObjectID
  , dbUtil = require('./dbUtil')
- , transaction = require('./transaction');
+ , transaction = require('./transaction')
+ , schema = require('./schema');
+
+require('./_extensions');
 
 // URL for MongoDB
 var url = '';
@@ -25,16 +28,18 @@ var setCollection = function(collName){
 };
 
 var connect = function(_url,onSuccess){
-  console.log('Connecting to MongoDB...');
+  _.print('Connecting to MongoDB...');
   setUrl(_url);
 
   MongoClient.connect(url, function (err, database) {
+    _.print('Attempting to connect to ' + url);
+
     if (err) throw err;
     db = database;
 
-    console.log('Connected to MongoDB');
+    _.print('Connected to MongoDB');
 
-    onSuccess();
+    onSuccess(database);
   });
 };
 exports.connect = connect;
@@ -44,55 +49,67 @@ var getRemote = function(){
 };
 exports.getRemote = getRemote;
 
-var initializeCollection = function(collName,onSuccess){
+var initializeBase = function(baseName,onSuccess,db){
+    var _baseName = baseName + '-Base-' + getUniqueId();
+    _.print('Initializing base for ' + _baseName);
 
-  db.createCollection(collName, function(err, collection){
+    return initializeCollection(
+        _baseName,
+        function(){
+          _.print('Initialized base for ' + _baseName);
+
+          _.safeInvoke(onSuccess);
+        },
+        db);
+};
+exports.initializeBase = initializeBase;
+
+var initializeCollection = function(collName,onSuccess,_db){
+  var _toRunDb = _db ? _db : db;
+
+  _toRunDb.createCollection(collName, function(err, collection){
     if (err){
-      console.log('problem creating collection ' + collName);
+      _.print('problem creating collection ' + collName);
       throw err;
     }
-    console.log('collection created ' + collName);
+    _.print('collection created ' + collName);
     RemoteDb = collection;
 
-    var _schemaDoc = { 
-      _meta: { 
-        type: 'CollectionSchema',
-        isCommitted: true
-      }, 
-      _id: getUniqueId() 
-    };
+    var _schemaDoc = schema.getNewSchemaDoc();
 
     RemoteDb.save(
-      _schemaDoc, 
+      _schemaDoc,
       function(err,doc){
-        if(err) throw err;        
-        console.log('successfully initialized ' + collName);
+        if(err) throw err;
+        _.print('successfully initialized ' + collName);
         onSuccess(_schemaDoc);
     });
   });
 };
 exports.initializeCollection = initializeCollection;
 
-var deleteCollection = function(collName,onSuccess){
-    db.dropCollection(collName, function(err){
-    if(err) throw err;        
+var deleteCollection = function(collName,onSuccess,_conn){
+    var _toRunDb = _conn || db;
+
+    _toRunDb.dropCollection(collName, function(err){
+    if(err) throw err;
     onSuccess();
-  });  
+  });
 };
 exports.deleteCollection = deleteCollection;
 
 var connectToCollection = function(_url,collName,onSuccess){
   setCollection(collName);
 
-  console.log('Loading data for ' + dbName);
+  _.print('Loading data for ' + dbName);
 
   connect(
     _url,
     function(){
       getHead(function(){
-        console.log('Data loaded.');
+        _.print('Data loaded.');
         onSuccess(LocalDb.Data);
-      });    
+      });
   });
 };
 exports.connectToCollection = connectToCollection;
@@ -108,16 +125,22 @@ var getSnapshot = function(version,onSuccess){
 };
 exports.getSnapshot = getSnapshot;
 
-var close = function(){
-  console.log('closing...');
-  db.close();
-  console.log('closed');
-};
+var close = function(aDb){
 
+  _.print('closing...');
+  if(aDb){
+      aDb.close();
+  }else{
+      db.close();
+  }
+  _.print('closed');
+};
 exports.close = close;
 
-var listAllCollections = function(onSuccess){
-  db.collectionNames(function(err, collections){
+var listAllCollections = function(onSuccess,_conn){
+  var _toRunDb = _conn || db;
+
+  _toRunDb.collectionNames(function(err, collections){
     onSuccess(collections);
   });
 };
@@ -134,7 +157,7 @@ var _runAllTransactions = function(db,txDb,txCollection,onError,onSuccess){
     db,
     txDb,
     txCollection[0],
-    onError, 
+    onError,
     function(){
       _runAllTransactions(db,txDb,_.rest(txCollection), onError, onSuccess);
   })
@@ -161,8 +184,8 @@ var commitAllLocals = function(onError,onSuccess){
           return dbUtil.getDocTimestamp(tx);
       });
 
-      console.log('sorted transactions:');
-      console.log(JSON.stringify(_sorted));
+      _.print('sorted transactions:');
+      _.print(JSON.stringify(_sorted));
 
       _runAllTransactions(
         snapshot,
@@ -175,20 +198,19 @@ var commitAllLocals = function(onError,onSuccess){
             snapshot,
             function(err){
               if(err) errorCollection.push({error:err});
-              onError(errorCollection);                  
-            });            
-        },        
-        //onSuccess,
+              onError(errorCollection);
+            });
+        },
         //all transactions successfully completed
         function(){
-          console.log('(transactor) committing snapshot');
+          _.print('(transactor) committing snapshot');
 
           commitSnapshot(
             snapshot,
             schemaDoc,
             onError,
             function(){
-              console.log('(transactor) snapshot committed, updating local copy');
+              _.print('(transactor) snapshot committed, updating local copy');
 
               //update local copy
               //now also requires updating db with information in transaction...
@@ -199,16 +221,16 @@ var commitAllLocals = function(onError,onSuccess){
                   transaction.runTransactionAgainstLocal(tx,LocalDb.Data);
               });
 
-              console.log('(transactor) listing all local post-snapshot');
+              _.print('(transactor) listing all local post-snapshot');
               _.each(LocalDb.Data,function(doc){
-                console.log(JSON.stringify(doc));
+                _.print(JSON.stringify(doc));
               });
 
               //update local transactions
               LocalDb.Transactions = [];
 
               onSuccess(LocalDb.Data);
-          });            
+          });
       });
   });
 };
@@ -222,8 +244,8 @@ var commitSnapshot = function(snapshot,schemaDoc,onError,onSuccess){
     schemaDoc,
     function(err,result){
       if(err){
-        console.log('(transactor) error committing snapshot, aborting');
-        console.log('(transactor) error: ' + err);
+        _.print('(transactor) error committing snapshot, aborting');
+        _.print('(transactor) error: ' + err);
         //destroy snapshot
         destroySnapshot(
           snapshot,
@@ -233,13 +255,13 @@ var commitSnapshot = function(snapshot,schemaDoc,onError,onSuccess){
         return;
       }
 
-      console.log('(transactor) snapshot committed, updating local copy');
+      _.print('(transactor) snapshot committed, updating local copy');
       //update local copy
       _.each(LocalDb.Data,markCommitted);
 
-      console.log('(transactor) listing all local post-snapshot');
+      _.print('(transactor) listing all local post-snapshot');
       _.each(LocalDb.Data,function(doc){
-        console.log(JSON.stringify(doc));
+        _.print(JSON.stringify(doc));
       });
 
       onSuccess(LocalDb.Data);
@@ -247,14 +269,14 @@ var commitSnapshot = function(snapshot,schemaDoc,onError,onSuccess){
 };
 
 var destroySnapshot = function(snapshot,onSuccess){
-  db.dropCollection(snapshot.options.create, 
+  db.dropCollection(snapshot.options.create,
     function(err){
     onSuccess();
-  });  
+  });
 };
 
 //no need to update to head, but need to write a routine that will do so
-var getHead = function(onSuccess){
+var getHead = function(onSuccess,_conn){
 
   var allSnaps = [];
   listAllSnapshots(dbName,function(snaps){
@@ -262,12 +284,12 @@ var getHead = function(onSuccess){
 
     //load default
     if(allSnaps.length < 1){
-      console.log('Loading "' + dbName + '-Base"');
+      _.print('Loading "' + dbName + '-Base"');
 
       getBaseName(
         dbName,
         function(_baseName){
-          console.log('Base name is "' + _baseName + '"');
+          _.print('Base name is "' + _baseName + '"');
 
           var collection = db.collection(_baseName);
           RemoteDb = collection;
@@ -279,7 +301,7 @@ var getHead = function(onSuccess){
               LocalDb.Data = docs;
               onSuccess(LocalDb.Data);
           });
-        });      
+        });
     //load latest snapshot
     }else{
 
@@ -291,7 +313,7 @@ var getHead = function(onSuccess){
 
       var snapshotName = _sorted[0].options.create;
 
-      console.log('Loading "' + snapshotName + '"');
+      _.print('Loading "' + snapshotName + '"');
 
       var collection = db.collection(snapshotName);
       RemoteDb = collection;
@@ -301,35 +323,17 @@ var getHead = function(onSuccess){
           if(err) throw err;
           LocalDb.Data = docs;
           onSuccess(LocalDb.Data);
-      });      
+      });
 
     }
   });
 };
+exports.getHead = getHead;
 
 var noOp = dbUtil.noOp;
 exports.noOp = noOp;
 
 var markCommitted = dbUtil.markCommitted;
-
-//needs to be replaced or wrap runTransaction()
-var upsertToSnapshot = function(snapshot,toInsert,onError,onSuccess){
-  var newInsert = copyDoc(toInsert);
-
-  newInsert = markCommitted(newInsert);
-
-  snapshot.save( 
-    newInsert,
-    function(err,doc){
-      if(err) onError(err);
-
-      onSuccess(toInsert);
-  });
-};
-
-var upsertToRemote = function(toInsert,onError,onSuccess){
-  dbUtil.upsertToRemote(RemoteDb,toInsert,onError,onSuccess);
-};
 
 var insertLocal = function(/*toInsert*/){
   var args = _.toArray(arguments);
@@ -345,60 +349,66 @@ exports.insert = insertLocal;
 var getUniqueId = function(){
   return dbUtil.getUniqueId();
 };
-
 exports.getUniqueId = getUniqueId;
 
 var copyDoc = function(toCopy){
   return dbUtil.copyDoc(toCopy);
 };
 
-var listAllSnapshots = function(name,onSuccess){
+var listAllSnapshots = function(name,onSuccess,_conn){
 
-  db.collectionNames(
-    function(err, collections){    
+  var _toRunDb = _conn || db;
+
+  _toRunDb.collectionNames(
+    function(err, collections){
       if(err) throw err;
 
       var snapshots = _.filter(
         collections,
         function(item){
           return item.name.indexOf(name + '-') >= 0 &&
-            item.name.indexOf(name + '-Base') === -1; 
+            item.name.indexOf(name + '-Base') === -1;
         });
 
       _.each(snapshots,function(snap){
-        console.log('Snapshot "' + snap.options.create + '"');
+        _.print('Snapshot "' + snap.options.create + '"');
       });
 
-      onSuccess(snapshots);      
+      onSuccess(snapshots);
     });
 };
 exports.listAllSnapshots = listAllSnapshots;
 
-var getBaseName = function(name,onSuccess){
+var getBaseName = function(name,onSuccess,_db){
+  var _toRunDb = _db ? _db : db;
 
-  db.collectionNames(function(err, collections){    
+  _.print('Getting base for ' + name);
+
+  _toRunDb.collectionNames(function(err, collections){
 
     var bases = _.filter(
       collections,
-      function(item){ 
-        return item.name.indexOf(name + '-Base') > -1; 
+      function(item){
+        return item.name.indexOf(name + '-Base') > -1;
       });
 
     var _noBaseError = 'No base exists for "' + name + '"';
     var _tooManyBasesError = 'More than one base exists for "' + name + '"';
 
     if(bases.length > 1){
-      console.log(_tooManyBasesError);
+      _.print(_tooManyBasesError);
       throw _tooManyBasesError;
-    } 
+    }
     if(bases.length < 1){
-      console.log(_noBaseError);
+      _.print(_noBaseError);
       throw _noBaseError;
     }
 
     _.each(bases,function(base){
-      console.log('Base "' + base.options.create + '"');
+      _.print('Base "' + base.options.create + '"');
     });
+
+    _.print('returning base name ' + bases[0].options.create);
 
     onSuccess(bases[0].options.create);
   });
@@ -406,64 +416,109 @@ var getBaseName = function(name,onSuccess){
 exports.getBaseName = getBaseName;
 
 var getSchemaDoc = function(){
-  return _.find(LocalDb.Data,function(doc){
-    return doc._meta.type === 'CollectionSchema';
-  });
+  return schema.getSchemaDoc(LocalDb.Data);
 };
 
 var createNewSnapshot = function(name,onSuccess){
   var snapName = name + '-' + getUniqueId();
-  console.log('Creating "' + snapName + '"');
+  _.print('Creating "' + snapName + '"');
 
   db.createCollection(
-    snapName, 
+    snapName,
     function(err, collection){
       if (err) throw err;
 
       var schemaDoc = copyDoc(getSchemaDoc());
       schemaDoc._meta.isCommitted = true;
 
-      collection.save( 
-        schemaDoc, 
+      collection.save(
+        schemaDoc,
         function(err,doc){
           if(err) throw err;
 
-          console.log('(transactor) listing all local pre-snapshot');
+          _.print('(transactor) listing all local pre-snapshot');
           _.each(LocalDb.Data,function(doc){
-            console.log(JSON.stringify(doc));
+            _.print(JSON.stringify(doc));
           });
 
-          console.log('Created snapshot:');
-          console.log(JSON.stringify(schemaDoc));
+          _.print('Created snapshot:');
+          _.print(JSON.stringify(schemaDoc));
 
-          onSuccess(collection, schemaDoc);    
-          
+          onSuccess(collection, schemaDoc);
+
         });//save schema doc
   });//create collection
 };
 
-var deleteAllSnapshots = function(name,onSuccess){
-  db.collectionNames(function(err, collections){    
-    listAllSnapshots(
-      name,
-      function(snapshots){
+var deleteBase = function(name,onSuccess,_conn){
+  getBaseName(
+    name,
+    function(_baseName){
+      deleteCollection(_baseName,onSuccess,_conn);
+    },
+    _conn);
+};
+exports.deleteBase = deleteBase;
 
-        var countToDelete = snapshots.length;
-        var deleted = 0;
+var deleteAllSnapshots = function(name,onSuccess,_conn){
+  var _toRunDb = _conn || db;
 
-        _.each(snapshots,function(_coll){
+  listAllSnapshots(
+    name,
+    function(snapshots){
+      _.print('deleting snapshots ' + JSON.stringify(snapshots));
+      deleteCollectionList(snapshots,onSuccess,_conn);
+    },
+    _toRunDb);
 
-          console.log('Deleting snapshot "' + _coll.options.create + '"');
-
-          db.dropCollection(_coll.options.create, function(err){
-            if(err) throw err;
-            deleted++;
-
-            if(deleted === countToDelete) onSuccess();
-          });
-
-        });
-      });
-  });  
 };
 exports.deleteAllSnapshots = deleteAllSnapshots;
+
+var deleteEverything = function(name,onSuccess,_conn){
+  _.print('deleting everything');
+  deleteAllSnapshots(
+    name,
+    function(){
+      deleteBase(name,onSuccess,_conn);
+    },
+    _conn);
+};
+exports.deleteEverything = deleteEverything;
+
+var deleteBeginningWith = function(name,onSuccess){
+  db.collectionNames(function(err, collections){
+
+    var _colls = _.filter(
+      collections,
+      function(item){
+        return item.options && item.options.create &&
+          item.options.create.indexOf(name) === 0;
+      });
+
+    deleteCollectionList(_colls,onSuccess);
+  });
+};
+exports.deleteBeginningWith = deleteBeginningWith;
+
+var deleteCollectionList = function(_colls,onSuccess,_conn){
+  if(_colls.length < 1){
+    onSuccess();
+    return;
+  }
+
+  var _toRunDb = _conn || db;  
+  var countToDelete = _colls.length;
+  var deleted = 0;
+
+  _.each(_colls,function(_coll){
+
+    _.print('Deleting collection "' + _coll.options.create + '"');
+
+    _toRunDb.dropCollection(_coll.options.create, function(err){
+      if(err) throw err;
+      deleted++;
+
+      if(deleted === countToDelete) onSuccess();
+    });
+  });  
+};

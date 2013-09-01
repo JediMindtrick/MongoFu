@@ -9,3 +9,4 @@ var MongoClient = require('mongodb').MongoClient
 require('./_extensions');
 
 exports.loadHead = transactor.loadHead;
+exports.runTxLocal = transaction.runTransactionAgainstLocal;

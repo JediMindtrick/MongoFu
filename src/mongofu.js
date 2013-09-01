@@ -70,8 +70,7 @@ var runCommand = function(){
 var tests = {
   '-testTransact':function(onSuccess){
 
-    var tx = transact.createTransaction(
-      {});
+    var tx = transact.createTransaction({});
 
     console.log(JSON.stringify(tx));
 

@@ -2,12 +2,20 @@ var _ = require('underscore')
  , dbUtil = require('./dbUtil');
  require('./_extensions');
 
- var getSchemaDoc = function(coll){
+var getSchemaDoc = function(coll){
   return _.find(coll,function(doc){
     return doc._meta.type === 'Schema';
   });
 };
 exports.getSchemaDoc = getSchemaDoc;
+
+var getDataDocs = function(coll){
+  return _.where(coll,function(doc){
+    return doc._meta.type !== 'Schema' &&
+    	doc._meta.type !== 'Transaction';
+  });
+};
+exports.getDataDocs = getDataDocs;
 
 var getNewSchemaDoc = function(dbName){
 

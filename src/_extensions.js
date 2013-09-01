@@ -8,7 +8,12 @@ var safeInvoke = function(/*args*/){
 		args[0].apply(this,_.rest(args));
 };
 var print = function(msg){
-	console.log(msg);
+	var toLog = msg;
+	if(_.isObject(msg)){
+		toLog = JSON.stringify(msg);
+	}
+
+	console.log(toLog);
 };
 
 _.mixin({

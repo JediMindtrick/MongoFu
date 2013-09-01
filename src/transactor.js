@@ -48,39 +48,38 @@ var getRemote = function(){
 };
 exports.getRemote = getRemote;
 
-var initializeBase = function(baseName,onSuccess,db){
+var initializeBase = function(baseName,onSuccess,_db){
     var _baseName = baseName + '-Base-' + getUniqueId();
     _.print('Initializing base for ' + _baseName);
 
     return initializeCollection(
+        _db,
         _baseName,
+        baseName,
         function(){
           _.print('Initialized base for ' + _baseName);
-
           _.safeInvoke(onSuccess);
-        },
-        db);
+        });
 };
 exports.initializeBase = initializeBase;
 
-var initializeCollection = function(collName,onSuccess,_db){
-  var _toRunDb = _db ? _db : db;
+var initializeCollection = function(_conn,collName,dbName,onSuccess){
 
-  _toRunDb.createCollection(collName, function(err, collection){
+  _conn.createCollection(collName, function(err, _db){
     if (err){
       _.print('problem creating collection ' + collName);
       throw err;
     }
     _.print('collection created ' + collName);
-    RemoteDb = collection;
+    RemoteDb = _db;
 
-    var _schemaDoc = schema.getNewSchemaDoc();
+    var _schemaDoc = schema.getNewSchemaDoc(dbName);
 
-    RemoteDb.save(
+    _db.save(
       _schemaDoc,
       function(err,doc){
         if(err) throw err;
-        _.print('successfully initialized ' + collName);
+        _.print('successfully initialized ' + dbName);
         onSuccess(_schemaDoc);
     });
   });
@@ -274,33 +273,46 @@ var destroySnapshot = function(snapshot,onSuccess){
   });
 };
 
-//no need to update to head, but need to write a routine that will do so
+var _getLocalDbFromRemote = function(_db,callback){
+  _db.find({}).toArray(
+    function(err,docs){
+      if(err) throw err;
+
+      var toReturn = {
+        Data: [],
+        EventTransactions: [],
+        Schema: {}
+      };
+
+      toReturn.Schema = schema.getSchemaDoc(docs);
+      toReturn.Data = schema.getDataDocs(docs);
+      toReturn.EventTransactions = transaction.getTransactionDocs(docs);
+
+      callback(toReturn);
+  });
+};
+
 var loadHead = function(_conn,_dbName,callback){
-//var loadHead = function(onSuccess,_conn){
 
   var allSnaps = [];
-//  listAllSnapshots(dbName,function(snaps){
   listAllSnapshots(_conn,_dbName,function(snaps){
     allSnaps = snaps;
 
     //load default
     if(allSnaps.length < 1){
-      _.print('Loading "' + dbName + '-Base"');
+      _.print('Loading "' + _dbName + '-Base"');
 
       getBaseName(
-        dbName,
+        _dbName,
         function(_baseName){
           _.print('Base name is "' + _baseName + '"');
 
-          var collection = db.collection(_baseName);
-          RemoteDb = collection;
+          var _db = _conn.collection(_baseName);
+          RemoteDb = _db;
 
-          RemoteDb.find({}).toArray(
-            function(err,docs){
-              if(err) throw err;
-
-              LocalDb.Data = docs;
-              onSuccess(LocalDb.Data);
+          _getLocalDbFromRemote(_db,function(toReturn){
+              LocalDb = toReturn;
+              callback(toReturn);
           });
         });
     //load latest snapshot
@@ -316,16 +328,13 @@ var loadHead = function(_conn,_dbName,callback){
 
       _.print('Loading "' + snapshotName + '"');
 
-      var collection = db.collection(snapshotName);
-      RemoteDb = collection;
+      var _db = _conn.collection(snapshotName);
+      RemoteDb = _db;
 
-      RemoteDb.find({}).toArray(
-        function(err,docs){
-          if(err) throw err;
-          LocalDb.Data = docs;
-          onSuccess(LocalDb.Data);
+      _getLocalDbFromRemote(_db,function(toReturn){
+          LocalDb = toReturn;
+          callback(toReturn);
       });
-
     }
   });
 };
@@ -356,8 +365,7 @@ var copyDoc = function(toCopy){
   return dbUtil.copyDoc(toCopy);
 };
 
-//var listAllSnapshots = function(name,onSuccess,_conn){
-  var listAllSnapshots = function(_conn,_dbName,callback){
+var listAllSnapshots = function(_conn,_dbName,callback){
 
   _conn.collectionNames(
     function(err, collections){

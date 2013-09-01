@@ -1,7 +1,16 @@
 var _ = require('underscore')
  , dbUtil = require('./dbUtil');
 
+require('./_extensions');
+
 var noOp = dbUtil.noOp;
+
+var getTransactionDocs = function(coll){
+  return _.where(coll,function(doc){
+    return doc._meta.type === 'Transaction';
+  });
+};
+exports.getTransactionDocs = getTransactionDocs;
 
 var createTransaction = function(/*actions*/){
 	var actions = _.toArray(arguments);

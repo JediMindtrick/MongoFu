@@ -9,7 +9,7 @@ var _ = require('underscore')
 };
 exports.getSchemaDoc = getSchemaDoc;
 
-var getNewSchemaDoc = function(){
+var getNewSchemaDoc = function(dbName){
 
  	var toReturn = dbUtil.getNewDbDoc({});
  	_.extend(toReturn._meta,{
@@ -17,6 +17,7 @@ var getNewSchemaDoc = function(){
  		isCommitted: true
  	});
 
+ 	toReturn.DbName = dbName;
  	toReturn.Types = ['Document','Transaction','Schema'];
  	toReturn.Constraints = {
  		Document: {

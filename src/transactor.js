@@ -11,7 +11,6 @@ require('./_extensions');
 var url = '';
 var db = null;
 var RemoteDb = null;
-//var LocalDb = [];
 var LocalDb = {
   Data: [],
   Transactions: [],
@@ -106,7 +105,7 @@ var connectToCollection = function(_url,collName,onSuccess){
   connect(
     _url,
     function(){
-      getHead(function(){
+      loadHead(function(){
         _.print('Data loaded.');
         onSuccess(LocalDb.Data);
       });
@@ -276,7 +275,7 @@ var destroySnapshot = function(snapshot,onSuccess){
 };
 
 //no need to update to head, but need to write a routine that will do so
-var getHead = function(onSuccess,_conn){
+var loadHead = function(onSuccess,_conn){
 
   var allSnaps = [];
   listAllSnapshots(dbName,function(snaps){
@@ -328,7 +327,7 @@ var getHead = function(onSuccess,_conn){
     }
   });
 };
-exports.getHead = getHead;
+exports.loadHead = loadHead;
 
 var noOp = dbUtil.noOp;
 exports.noOp = noOp;

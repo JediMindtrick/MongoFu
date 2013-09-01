@@ -1,14 +1,16 @@
-var transactor = require('../../src/transactor.js')
-  , _ = require('underscore')
-  , url = require('../helpers').testUrl;
+var util = require('../../src/dbUtil.js')
+  , transactor = require('../../src/transactor.js')
+  , _ = require('underscore') 
+  , help = require('../helpers');
+
+var url = help.testUrl
+  , runWithTestDb = help.runWithTestDb;
+
 require('../../src/_extensions');
 
-
-describe('database-level operations',function(){
-
+describe('transactor operations',function(){
 
   it('should create and destroy databases',function(done){
-    expect(true).toBe(true);
 
     transactor.connect(
       url,
@@ -36,13 +38,15 @@ describe('database-level operations',function(){
               conn);
           },conn);
       });
+
   });
   
   it('should create a database with the name "Base"',function(done){
+
     runWithTestDb({
         done: done,
         url: url,
-        dbName: ':BaseCreateTest'
+        dbName: ':Transactor:BaseCreateTest'
       },
       function(conn,cleanup){
 
@@ -51,7 +55,7 @@ describe('database-level operations',function(){
 
             expect(
               _.some(collections,function(coll){
-                return coll.name.indexOf('AutoTest:BaseCreateTest-Base') > -1;
+                return coll.name.indexOf('AutoTest:Transactor:BaseCreateTest-Base') > -1;
                 })
               ).toBe(true);
 
@@ -59,49 +63,10 @@ describe('database-level operations',function(){
           }
           ,conn);        
     });
+
   });
 
-  it('should load an in-memory database',function(done){
-    runWithTestDb({
-        done: done,
-        url: url,
-        dbName: ':InMemoryTest'
-      },
-      function(conn,cleanup){
-
-
-        cleanup();
-    });
-  });
+//  it('should run transactions against a durable store')
+//  it('should create durable snapshots')
 
 });
-
-var runWithTestDb = function(opts,toRun){
-
-  var _dbName = 'AutoTest' + opts.dbName;
-
-  transactor.connect(
-    opts.url,
-    function(conn){
-
-      //this actually creates our database
-      transactor.initializeBase(
-        _dbName,
-        function(_schemaDoc){
-
-          //callback will be called by test code
-          //toRun is our actual test
-          toRun(conn,function(){
-
-            transactor.deleteEverything(
-              _dbName,
-              function(){
-                conn.close();
-                opts.done();
-              },
-              conn);
-          });
-        },
-        conn);
-    });
-};

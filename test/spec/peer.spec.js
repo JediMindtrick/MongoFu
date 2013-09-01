@@ -80,7 +80,7 @@ describe('peer operations',function(){
         });       
     });
   });
-/*
+
   it('should allow to push transactions that were only committed locally',function(done){
     var _dbName = ':Peer:PushUncommittedTxTest';
 
@@ -90,9 +90,9 @@ describe('peer operations',function(){
         dbName: _dbName
       },
       function(conn,cleanup){
-        _dbName = 'AutoTest' + _dbName;
+        _headName = 'AutoTest' + _dbName;
         //create the database
-        peer.loadHead(conn,_dbName,function(db){
+        peer.loadHead(conn,_headName,function(db){
 
           peer.runTxLocal(db,createTransaction({ test: 'doc1' },{ test: 'doc2' }));
 
@@ -104,7 +104,9 @@ describe('peer operations',function(){
           peer.pushCommittedLocalTxToRemote(
             conn,
             db,
-            function(){
+            function(_db){
+
+              _.print('pushed tx to remote');
 
               //assert some properties of it
               expect(
@@ -112,7 +114,7 @@ describe('peer operations',function(){
                   return tx._meta.dbStatus === 'committedBoth';
                 })).toBe(true);
 
-              peer.loadHead(conn,_dbName,function(newHead){
+              peer.loadHead(conn,_headName,function(newHead){
                 //assert some properties of it
                 expect(_.size(newHead.EventTransactions)).toBe(1);
                 expect(_.size(newHead.Data)).toBe(2);
@@ -127,6 +129,5 @@ describe('peer operations',function(){
         });       
     });
   });
-*/
 
 });

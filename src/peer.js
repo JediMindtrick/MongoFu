@@ -11,9 +11,11 @@ require('./_extensions');
 exports.loadHead = transactor.loadHead;
 exports.runTxLocal = transaction.runTransactionAgainstLocal;
 
-exports.pushCommittedLocalTxToRemote = function(conn,db,callback){
+exports.pushCommittedLocalTxToRemote = function(_conn,_db,callback){
 	//get all committed locals
-	var _tx = _.every(db.EventTransactions,dbUtil.isCommittedLocal);
+	_.print('getting all committed locals');
+	var _txColl = _.every(_db.EventTransactions,dbUtil.isCommittedLocal);
 	//push them to remote
-	transactor.pushTxToRemote(conn,db.Schema.DbName,callback);
+	_.print('pushing to remote');
+	transactor.pushTxToRemote(_conn,_db,_txColl,callback);
 };

@@ -30,15 +30,15 @@ var connect = function(_url,onSuccess){
   _.print('Connecting to MongoDB...');
   setUrl(_url);
 
-  MongoClient.connect(url, function (err, database) {
+  MongoClient.connect(url, function (err, _conn) {
     _.print('Attempting to connect to ' + url);
 
     if (err) throw err;
-    db = database;
+    db = _conn;
 
     _.print('Connected to MongoDB');
 
-    onSuccess(database);
+    onSuccess(_conn);
   });
 };
 exports.connect = connect;
@@ -74,6 +74,7 @@ var initializeCollection = function(_conn,collName,dbName,onSuccess){
     RemoteDb = _db;
 
     var _schemaDoc = schema.getNewSchemaDoc(dbName);
+    _schemaDoc._meta.isCommitted = true;
 
     _db.save(
       _schemaDoc,
@@ -104,9 +105,9 @@ var connectToCollection = function(_url,collName,onSuccess){
   connect(
     _url,
     function(){
-      loadHead(function(){
+      loadHead(function(_db){
         _.print('Data loaded.');
-        onSuccess(LocalDb.Data);
+        onSuccess(_db);
       });
   });
 };
@@ -144,138 +145,14 @@ var listAllCollections = function(onSuccess,_conn){
 };
 exports.listAllCollections = listAllCollections;
 
-var _runAllTransactions = function(db,txDb,txCollection,onError,onSuccess){
-  if(txCollection.length === 0){
-    onSuccess();
-    return;
-  }
-
-  //process and recur
-  transaction.runTransaction(
-    db,
-    txDb,
-    txCollection[0],
-    onError,
-    function(){
-      _runAllTransactions(db,txDb,_.rest(txCollection), onError, onSuccess);
-  })
-};
-
-//probably needs to return a deferred and implement accordingly
-var commitAllLocals = function(onError,onSuccess){
-  var toAddCount = LocalDb.Data.length;
-  var added = 0;
-  var errored = 0;
-  var errorCollection = [];
-  var insertedCollection = [];
-
-  //create snapshot
-  createNewSnapshot(
-    dbName,
-    //success callback only, doesn't require error callback
-    function(snapshot,schemaDoc){
-
-      //sort earliest first
-      var _sorted = _.sortBy(
-        LocalDb.Transactions,
-        function(tx){
-          return dbUtil.getDocTimestamp(tx);
-      });
-
-      _.print('sorted transactions:');
-      _.print(JSON.stringify(_sorted));
-
-      _runAllTransactions(
-        snapshot,
-        snapshot,
-        _sorted,
-        //onError
-        function(err){
-          //destroy snapshot
-          destroySnapshot(
-            snapshot,
-            function(err){
-              if(err) errorCollection.push({error:err});
-              onError(errorCollection);
-            });
-        },
-        //all transactions successfully completed
-        function(){
-          _.print('(transactor) committing snapshot');
-
-          commitSnapshot(
-            snapshot,
-            schemaDoc,
-            onError,
-            function(){
-              _.print('(transactor) snapshot committed, updating local copy');
-
-              //update local copy
-              //now also requires updating db with information in transaction...
-              _.each(LocalDb.Data,markCommitted);
-              _.each(
-                LocalDb.Transactions,
-                function(tx){
-                  transaction.runTransactionAgainstLocal(tx,LocalDb.Data);
-              });
-
-              _.print('(transactor) listing all local post-snapshot');
-              _.each(LocalDb.Data,function(doc){
-                _.print(JSON.stringify(doc));
-              });
-
-              //update local transactions
-              LocalDb.Transactions = [];
-
-              onSuccess(LocalDb.Data);
-          });
-      });
-  });
-};
-exports.commit = commitAllLocals;
-
-var commitSnapshot = function(snapshot,schemaDoc,onError,onSuccess){
-
-  schemaDoc._meta.isCommitted = true;
-
-  snapshot.save(
-    schemaDoc,
-    function(err,result){
-      if(err){
-        _.print('(transactor) error committing snapshot, aborting');
-        _.print('(transactor) error: ' + err);
-        //destroy snapshot
-        destroySnapshot(
-          snapshot,
-          noOp);
-
-        onError([{error:err}]);
-        return;
-      }
-
-      _.print('(transactor) snapshot committed, updating local copy');
-      //update local copy
-      _.each(LocalDb.Data,markCommitted);
-
-      _.print('(transactor) listing all local post-snapshot');
-      _.each(LocalDb.Data,function(doc){
-        _.print(JSON.stringify(doc));
-      });
-
-      onSuccess(LocalDb.Data);
-  });
-};
-
-var destroySnapshot = function(snapshot,onSuccess){
-  db.dropCollection(snapshot.options.create,
-    function(err){
-    onSuccess();
-  });
-};
+exports.pushTxToRemote = require('./snapshot.js').pushTxToRemote;
 
 var _getLocalDbFromRemote = function(_db,callback){
+
+      
   _db.find({}).toArray(
     function(err,docs){
+
       if(err) throw err;
 
       var toReturn = {
@@ -311,7 +188,6 @@ var loadHead = function(_conn,_dbName,callback){
           RemoteDb = _db;
 
           _getLocalDbFromRemote(_db,function(toReturn){
-              LocalDb = toReturn;
               callback(toReturn);
           });
         });
@@ -329,10 +205,8 @@ var loadHead = function(_conn,_dbName,callback){
       _.print('Loading "' + snapshotName + '"');
 
       var _db = _conn.collection(snapshotName);
-      RemoteDb = _db;
 
       _getLocalDbFromRemote(_db,function(toReturn){
-          LocalDb = toReturn;
           callback(toReturn);
       });
     }
@@ -342,8 +216,6 @@ exports.loadHead = loadHead;
 
 var noOp = dbUtil.noOp;
 exports.noOp = noOp;
-
-var markCommitted = dbUtil.markCommitted;
 
 var insertLocal = function(/*toInsert*/){
   var args = _.toArray(arguments);
@@ -422,41 +294,6 @@ var getBaseName = function(name,onSuccess,_db){
   });
 };
 exports.getBaseName = getBaseName;
-
-var getSchemaDoc = function(){
-  return schema.getSchemaDoc(LocalDb.Data);
-};
-
-var createNewSnapshot = function(name,onSuccess){
-  var snapName = name + '-' + getUniqueId();
-  _.print('Creating "' + snapName + '"');
-
-  db.createCollection(
-    snapName,
-    function(err, collection){
-      if (err) throw err;
-
-      var schemaDoc = copyDoc(getSchemaDoc());
-      schemaDoc._meta.isCommitted = true;
-
-      collection.save(
-        schemaDoc,
-        function(err,doc){
-          if(err) throw err;
-
-          _.print('(transactor) listing all local pre-snapshot');
-          _.each(LocalDb.Data,function(doc){
-            _.print(JSON.stringify(doc));
-          });
-
-          _.print('Created snapshot:');
-          _.print(JSON.stringify(schemaDoc));
-
-          onSuccess(collection, schemaDoc);
-
-        });//save schema doc
-  });//create collection
-};
 
 var deleteBase = function(name,onSuccess,_conn){
   getBaseName(

@@ -6,7 +6,7 @@ require('./_extensions');
 var noOp = dbUtil.noOp;
 
 var getTransactionDocs = function(coll){
-  return _.where(coll,function(doc){
+  return _.filter(coll,function(doc){
     return doc._meta.type === 'Transaction';
   });
 };

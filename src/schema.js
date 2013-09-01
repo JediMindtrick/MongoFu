@@ -10,8 +10,8 @@ var getSchemaDoc = function(coll){
 exports.getSchemaDoc = getSchemaDoc;
 
 var getDataDocs = function(coll){
-  return _.where(coll,function(doc){
-    return doc._meta.type !== 'Schema' &&
+  return _.filter(coll,function(doc){
+  	return doc._meta.type !== 'Schema' &&
     	doc._meta.type !== 'Transaction';
   });
 };
@@ -22,7 +22,7 @@ var getNewSchemaDoc = function(dbName){
  	var toReturn = dbUtil.getNewDbDoc({});
  	_.extend(toReturn._meta,{
  		type: 'Schema',
- 		isCommitted: true
+ 		isCommitted: false
  	});
 
  	toReturn.DbName = dbName;

@@ -9,7 +9,7 @@ var safeInvoke = function(/*args*/){
 };
 var print = function(msg){
 	var toLog = msg;
-	if(_.isObject(msg)){
+	if(_.isObject(msg) || _.isArray(msg)){
 		toLog = JSON.stringify(msg);
 	}
 

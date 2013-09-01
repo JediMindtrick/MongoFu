@@ -15,11 +15,11 @@ var isCommittedLocal = function(doc){
 };
 exports.isCommittedLocal = isCommittedLocal;
 
-var markCommitted = function(doc){
+var markCommittedBoth = function(doc){
   doc._meta.dbStatus = 'committedBoth';
   return doc;
 };
-exports.markCommitted = markCommitted;
+exports.markCommittedBoth = markCommittedBoth;
 
 var isCommittedBoth = function(doc){
   return doc._meta.dbStatus === 'committedBoth';

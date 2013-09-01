@@ -3,6 +3,8 @@ var MongoClient = require('mongodb').MongoClient
  , ObjectID = require('mongodb').ObjectID
  , peer = require('./transactor')
  , transact = require('./transaction');
+require('./_extensions.js');
+
 
 //mongodb://[username:password@]host1[:port1][,host2[:port2],...[,hostN[:portN]]][/[database][?options]]
 var _remoteUrl = 'mongodb://CaseRMMongo:YajoaGyDA4Br_BkvfawyPVze!';
@@ -32,7 +34,7 @@ var _getLatest = function(onSuccess){
 var start = function(){
 
   //bypass getLatest
-  if(arg1 !== '-t' || _.contains(['-listAllRemote','-loadSnapshot'],arg2)){
+  if(arg1 !== '-t' || _.contains(['-listAllRemote','-loadSnapshot','-load'],arg2)){
     console.log('Bypassing default load');
     runCommand();
 
@@ -170,7 +172,18 @@ var tests = {
 };
 
 var operations = {
+  '-load': function(onSuccess){
+    peer.connect(url,function(_conn){
 
+      var _db = _conn.collection(arg2);
+      _db.find({}).toArray(function(err,docs){
+
+        _.print(docs);  
+        _conn.close();
+        onSuccess();
+      });
+    });
+  },
   '-recreate': function(onSuccess){
     operations['-delete'](function(){
       operations['-init'](onSuccess);

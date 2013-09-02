@@ -36,35 +36,6 @@ var getUniqueId = function(){
 };
 exports.getUniqueId = getUniqueId;
 
-var getNewDbDoc = function(toInsert){
-  toInsert._meta = {
-    type: 'Document',
-    dbStatus: 'uncommitted' 
-  };
-
-  toInsert._id = getUniqueId();
-
-  return toInsert;
-};
-exports.getNewDbDoc = getNewDbDoc;
-
-var upsertToRemote = function(coll,toInsert,onError,onSuccess){
-  var newInsert = copyDoc(toInsert);
-
-  newInsert = markCommitted(newInsert);
-
-  coll.save( 
-    newInsert,
-    function(err,doc){
-      if(err) onError(err);
-
-      toInsert = markCommitted(toInsert);
-
-      onSuccess(toInsert);
-  });
-};
-exports.upsertToRemote = upsertToRemote;
-
 var getDocTimestamp = function(doc){
 	return ObjectID(doc._id).getTimestamp().getTime();
 };

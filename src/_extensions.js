@@ -2,6 +2,7 @@ var _ = require('underscore');
 
 var noOp = function(){};
 var always = function(){ return true; };
+var never = function(){ return false; };
 var safeInvoke = function(/*args*/){  
 	var args = _.toArray(arguments);
 	if(_.head(args))
@@ -20,5 +21,6 @@ _.mixin({
 	noOp: noOp,
 	always: always,
 	print: print,
-	safeInvoke: safeInvoke
+	safeInvoke: safeInvoke,
+	never: never
 });

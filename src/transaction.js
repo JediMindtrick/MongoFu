@@ -1,5 +1,6 @@
 var _ = require('underscore')
- , dbUtil = require('./dbUtil');
+ , dbUtil = require('./dbUtil')
+ , getNewDbDoc = require('./document').getNewDbDoc;
 
 require('./_extensions');
 
@@ -15,7 +16,8 @@ exports.getTransactionDocs = getTransactionDocs;
 var createTransaction = function(/*actions*/){
 	var actions = _.toArray(arguments);
 
-	var toReturn = dbUtil.getNewDbDoc({});
+	var toReturn = getNewDbDoc({});
+	var _txId = toReturn._id;
 	toReturn._meta.type = 'Transaction';
 	toReturn.actions = [];
 	_.each(actions,function(action){
@@ -23,8 +25,12 @@ var createTransaction = function(/*actions*/){
 		var _newDoc = action;
 
 		if(!action._meta){
-			_newDoc = dbUtil.getNewDbDoc(_newDoc);
+			_newDoc = getNewDbDoc(_newDoc);
 		}
+
+//		_newDoc._meta.transactions = _newDoc._meta.transactions || [];
+		_newDoc._meta.transactions.push(_txId);
+		_newDoc._meta.lastTransaction = _txId;
 
 		var newAction = {
 			dbAction: action.dbAction ? action.dbAction : 'upsert',
@@ -37,46 +43,6 @@ var createTransaction = function(/*actions*/){
 	return toReturn;
 };
 exports.createTransaction = createTransaction;
-
-var runActions = function(db,actions,onError,onSuccess){
-	if(actions.length === 0) {
-		onSuccess();
-		return;
-	}
-	//process and recur	
-	dbUtil.upsertToRemote(
-		db,
-		actions[0].doc,
-		onError,
-		function(){
-			runActions(db,_.rest(actions),onError,onSuccess);
-		});
-};
-
-var runTransaction = function(db,txDb,tx,onError,onSuccess){
-
-	console.log(JSON.stringify(tx.actions));
-
-	//sort earliest first
-	var _sorted = _.sortBy(
-		tx.actions,
-		function(action){
-			return action.actionAdded;
-	});
-
-	console.log('sorted: ');
-	console.log(JSON.stringify(_sorted));
-
-	//need to do this in order, and take into account async nature of upsert
-	runActions(
-		db,
-		_sorted,
-		onError,
-		function(){
-			dbUtil.upsertToRemote(txDb,tx,onError,onSuccess);
-		});	
-};
-exports.runTransaction = runTransaction;
 
 var runTransactionAgainstLocal = function(db,tx){
 
